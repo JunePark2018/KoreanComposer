@@ -1,5 +1,7 @@
 # KoreanComposer
 
+[![NuGet](https://img.shields.io/nuget/v/KoreanComposer.svg)](https://www.nuget.org/packages/KoreanComposer)
+
 [English](#english) | [한국어](#한국어)
 
 ---
