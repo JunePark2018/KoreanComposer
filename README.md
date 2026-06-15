@@ -307,15 +307,6 @@ Composing      After Backspace   Note
 ㅂ             (none)            initial removed, composition ends
 ```
 
-### TestConsole
-
-A minimal console app for manual and automated testing is included in `TestConsole/`.
-
-```
-cd TestConsole
-dotnet run
-```
-
 ### License
 
 MIT — see [LICENSE](LICENSE).
