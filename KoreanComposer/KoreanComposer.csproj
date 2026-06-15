@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+
+    <!-- NuGet 메타데이터 -->
+    <PackageId>KoreanComposer</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>JunePark2018</Authors>
+    <Description>
+      Lightweight, dependency-free Hangul (Korean) composer for real-time syllable assembly.
+      Converts Dubeolsik (두벌식) Latin keystrokes into Unicode syllable blocks (U+AC00–U+D7A3)
+      on the fly. Suitable for game engines, custom text input widgets, or any environment
+      where OS IME is unavailable.
+    </Description>
+    <PackageTags>korean;hangul;ime;dubeolsik;composition;input</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/JunePark2018/KoreanComposer</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageProjectUrl>https://github.com/JunePark2018/KoreanComposer</PackageProjectUrl>
+
+    <!-- 소스 링크 (디버깅 시 소스 탐색 지원) -->
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <!-- README를 NuGet 패키지에 포함 -->
+  <ItemGroup>
+    <None Include="..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

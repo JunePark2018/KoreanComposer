@@ -1,11 +1,19 @@
 using System.Collections.Generic;
 
-namespace KoreanComposer
+namespace Hangul
 {
     /// <summary>
     /// 한글 자모 조합기.
     /// 두벌식 자모 문자(U+3131–U+3163)를 한 글자씩 받아
     /// 유니코드 음절 블록(U+AC00–U+D7A3)으로 실시간 조합한다.
+    ///
+    /// <b>스레드 안전성:</b> 인스턴스 상태를 공유하므로 스레드 안전하지 않다.
+    /// 반드시 단일 스레드(UI 스레드 등)에서만 사용하거나,
+    /// 스레드마다 별도 인스턴스를 생성해야 한다.
+    ///
+    /// <b>비자모 문자:</b> <see cref="Input"/>은 U+3131–U+3163 범위의 자모만 처리한다.
+    /// 스페이스·엔터·특수문자 등은 호출 전에 걸러야 한다.
+    /// 걸러지지 않은 문자는 조합을 강제 확정한 뒤 그대로 Committed에 포함되어 반환된다.
     ///
     /// 사용법:
     /// <code>
@@ -54,6 +62,9 @@ namespace KoreanComposer
         private static readonly Dictionary<char, int> s_jungIdx;
         private static readonly Dictionary<char, int> s_jongIdx;  // 0 제외
 
+        // ── 복합 중성 역방향: 합성_중성_idx → 기반_중성_idx (백스페이스용) ──
+        private static readonly Dictionary<int, int> s_jungBase;
+
         // ── 복합 중성: (기반_중성_idx, 추가_중성_idx) → 합성_중성_idx ─────────
         private static readonly Dictionary<(int, int), int> s_compoundJung = new()
         {
@@ -66,21 +77,21 @@ namespace KoreanComposer
             { (18, 20), 19 },  // ㅡ+ㅣ=ㅢ
         };
 
-        // ── 복합 종성 형성: (현재_종성_idx, 추가_자음_초성_idx) → (합성_종성_idx, 분리_초성_idx) ─
-        // 분리_초성_idx: 모음 입력 시 다음 음절의 초성이 되는 자음의 초성 인덱스
-        private static readonly Dictionary<(int, int), (int Jong, int SplitCho)> s_compoundJong = new()
+        // ── 복합 종성 형성: (현재_종성_idx, 추가_자음_초성_idx) → 합성_종성_idx ─
+        // 분리 정보는 s_splitJong 이 담당하므로 여기선 결과 인덱스만 저장한다.
+        private static readonly Dictionary<(int, int), int> s_compoundJong = new()
         {
-            { ( 1,  9), ( 3,  9) },  // ㄱ+ㅅ→ㄳ  | 분리: ㄱ+ㅅ
-            { ( 4, 12), ( 5, 12) },  // ㄴ+ㅈ→ㄵ  | 분리: ㄴ+ㅈ
-            { ( 4, 18), ( 6, 18) },  // ㄴ+ㅎ→ㄶ  | 분리: ㄴ+ㅎ
-            { ( 8,  0), ( 9,  0) },  // ㄹ+ㄱ→ㄺ  | 분리: ㄹ+ㄱ
-            { ( 8,  6), (10,  6) },  // ㄹ+ㅁ→ㄻ  | 분리: ㄹ+ㅁ
-            { ( 8,  7), (11,  7) },  // ㄹ+ㅂ→ㄼ  | 분리: ㄹ+ㅂ
-            { ( 8,  9), (12,  9) },  // ㄹ+ㅅ→ㄽ  | 분리: ㄹ+ㅅ
-            { ( 8, 16), (13, 16) },  // ㄹ+ㅌ→ㄾ  | 분리: ㄹ+ㅌ
-            { ( 8, 17), (14, 17) },  // ㄹ+ㅍ→ㄿ  | 분리: ㄹ+ㅍ
-            { ( 8, 18), (15, 18) },  // ㄹ+ㅎ→ㅀ  | 분리: ㄹ+ㅎ
-            { (17,  9), (18,  9) },  // ㅂ+ㅅ→ㅄ  | 분리: ㅂ+ㅅ
+            { ( 1,  9),  3 },  // ㄱ+ㅅ→ㄳ
+            { ( 4, 12),  5 },  // ㄴ+ㅈ→ㄵ
+            { ( 4, 18),  6 },  // ㄴ+ㅎ→ㄶ
+            { ( 8,  0),  9 },  // ㄹ+ㄱ→ㄺ
+            { ( 8,  6), 10 },  // ㄹ+ㅁ→ㄻ
+            { ( 8,  7), 11 },  // ㄹ+ㅂ→ㄼ
+            { ( 8,  9), 12 },  // ㄹ+ㅅ→ㄽ
+            { ( 8, 16), 13 },  // ㄹ+ㅌ→ㄾ
+            { ( 8, 17), 14 },  // ㄹ+ㅍ→ㄿ
+            { ( 8, 18), 15 },  // ㄹ+ㅎ→ㅀ
+            { (17,  9), 18 },  // ㅂ+ㅅ→ㅄ
         };
 
         // ── 복합 종성 분리: 합성_종성_idx → (남는_종성_idx, 분리_초성_idx) ────
@@ -108,6 +119,10 @@ namespace KoreanComposer
             s_jongIdx = new Dictionary<char, int>();
             for (int i = 1; i < s_jong.Length; i++)
                 s_jongIdx[s_jong[i]] = i;
+
+            s_jungBase = new Dictionary<int, int>();
+            foreach (var kvp in s_compoundJung)
+                s_jungBase[kvp.Value] = kvp.Key.Item1;
         }
 
         // ── 조합 상태 ─────────────────────────────────────────────────────────
@@ -209,7 +224,7 @@ namespace KoreanComposer
         private (string Committed, char Composing) InputConsonant(char jamo)
         {
             int choIdx  = s_choIdx[jamo];
-            int jongIdx = s_jongIdx.GetValueOrDefault(jamo, 0);
+            int jongIdx = s_jongIdx.TryGetValue(jamo, out int j) ? j : 0;
 
             // 빈 상태: 새 초성 시작
             if (_cho < 0)
@@ -227,6 +242,8 @@ namespace KoreanComposer
             }
 
             // 초성+중성, 종성 없음: 종성으로 흡수 시도
+            // ㄲ·ㄸ·ㅃ·ㅆ·ㅉ 등 쌍자음은 s_jongIdx에 등록되지 않으므로 jongIdx == 0이 되어
+            // 종성으로 흡수되지 않고 아래 '종성 불가' 경로로 자동 분기된다.
             if (_jong == 0)
             {
                 if (jongIdx > 0)
@@ -241,9 +258,9 @@ namespace KoreanComposer
             }
 
             // 초성+중성+종성: 복합 종성 시도
-            if (jongIdx > 0 && s_compoundJong.TryGetValue((_jong, choIdx), out var compound))
+            if (jongIdx > 0 && s_compoundJong.TryGetValue((_jong, choIdx), out int newJong))
             {
-                _jong = compound.Jong;
+                _jong = newJong;
                 return (string.Empty, ComposingChar);
             }
 
@@ -321,11 +338,7 @@ namespace KoreanComposer
 
         // 복합 중성의 기반 중성 인덱스 반환 (백스페이스용). 단순 중성이면 -1.
         private static int FindBaseJung(int compoundIdx)
-        {
-            foreach (var kvp in s_compoundJung)
-                if (kvp.Value == compoundIdx) return kvp.Key.Item1;
-            return -1;
-        }
+            => s_jungBase.TryGetValue(compoundIdx, out int baseIdx) ? baseIdx : -1;
 
         private static Dictionary<char, int> BuildIndex(char[] arr)
         {

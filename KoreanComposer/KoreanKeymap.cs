@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace KoreanComposer
+namespace Hangul
 {
     /// <summary>
     /// 두벌식 표준 자판 (KS X 5002) 키맵.
@@ -53,5 +53,12 @@ namespace KoreanComposer
         /// <returns>변환 성공 여부. false면 <paramref name="latin"/>은 자판 범위 밖.</returns>
         public static bool TryMap(char latin, out char jamo)
             => s_map.TryGetValue(latin, out jamo);
+
+        /// <summary>
+        /// 조합 강제 확정 구분자 여부를 반환한다.
+        /// 구분자('\')가 입력되면 현재 조합 중인 글자를 확정하고 구분자 자체는 출력하지 않는다.
+        /// 예: "qkr" → "박"  vs  "qk\r" → "바ㄱ"
+        /// </summary>
+        public static bool IsSeparator(char c) => c == '\\';
     }
 }

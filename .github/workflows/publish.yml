@@ -1,0 +1,35 @@
+name: Publish to NuGet
+
+on:
+  push:
+    tags:
+      - 'v*'   # v1.0.0 형태의 태그 푸시 시 자동 실행
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # OIDC 토큰 발급에 필수
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.x'
+
+      - name: Pack
+        run: dotnet pack KoreanComposer/KoreanComposer.csproj -c Release -o ./nupkg
+
+      - name: NuGet login (OIDC)
+        uses: NuGet/login@v1
+        id: login
+
+      - name: Push
+        run: |
+          dotnet nuget push ./nupkg/*.nupkg \
+            --api-key ${{ steps.login.outputs.NUGET_API_KEY }} \
+            --source https://api.nuget.org/v3/index.json
+          dotnet nuget push ./nupkg/*.snupkg \
+            --api-key ${{ steps.login.outputs.NUGET_API_KEY }} \
+            --source https://api.nuget.org/v3/index.json
