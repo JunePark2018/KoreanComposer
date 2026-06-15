@@ -220,8 +220,8 @@ Key   Committed   Composing   Explanation
 r                 ㄱ          initial consonant ㄱ
 k                 가          vowel ㅏ added → 가
 s                 간          final consonant ㄴ added → 간
-d     간          아          ㄴ splits off as next initial; 아 starts
-k     아          나          ㄴ + ㅏ → 나
+s     간          ㄴ          ㄴ splits off as next initial; new ㄴ starts
+k                 나          vowel ㅏ added → 나
       나                      Flush() → 나
 ```
 
