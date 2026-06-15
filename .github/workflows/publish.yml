@@ -8,6 +8,7 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    environment: nuget   # nuget.org Trusted Publishing 정책의 environment name과 일치해야 함
     permissions:
       id-token: write   # OIDC 토큰 발급에 필수
 
