@@ -25,6 +25,8 @@ jobs:
       - name: NuGet login (OIDC)
         uses: NuGet/login@v1
         id: login
+        with:
+          user: JunePark
 
       - name: Push
         run: |
