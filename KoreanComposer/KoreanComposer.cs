@@ -130,6 +130,10 @@ namespace Hangul
         private int _jung = -1;  // 중성 인덱스 (-1 = 없음)
         private int _jong =  0;  // 종성 인덱스 (0 = 없음)
 
+        // 초성 없이 입력된 모음 인덱스 (-1 = 없음). 결합할 초성이 없을 때
+        // 복합 모음(ㅗ+ㅏ=ㅘ 등)을 계속 결합할 수 있도록 별도로 보관한다.
+        private int _bareJung = -1;
+
         // ── 공개 API ──────────────────────────────────────────────────────────
 
         /// <summary>현재 조합 중인 글자. 조합 중이 아니면 '\0'.</summary>
@@ -137,14 +141,14 @@ namespace Hangul
         {
             get
             {
-                if (_cho < 0) return '\0';
+                if (_cho < 0) return _bareJung < 0 ? '\0' : s_jung[_bareJung];
                 if (_jung < 0) return s_cho[_cho];
                 return MakeSyllable(_cho, _jung, _jong);
             }
         }
 
         /// <summary>조합 진행 중이면 true.</summary>
-        public bool IsComposing => _cho >= 0;
+        public bool IsComposing => _cho >= 0 || _bareJung >= 0;
 
         /// <summary>
         /// 자모 문자 하나를 입력한다.
@@ -174,7 +178,13 @@ namespace Hangul
         /// </returns>
         public (bool Consumed, char Composing) Backspace()
         {
-            if (_cho < 0) return (false, '\0');
+            if (_cho < 0)
+            {
+                // 초성 없이 모음만 보관 중 → 복합 모음이면 분해, 단순 모음이면 제거
+                if (_bareJung < 0) return (false, '\0');
+                _bareJung = FindBaseJung(_bareJung);
+                return (true, ComposingChar);
+            }
 
             // 종성 있음 → 종성 한 단계 분해
             if (_jong > 0)
@@ -205,7 +215,7 @@ namespace Hangul
         /// <returns>확정된 문자열. 조합 중이 아니면 빈 문자열.</returns>
         public string Flush()
         {
-            if (_cho < 0) return string.Empty;
+            if (_cho < 0 && _bareJung < 0) return string.Empty;
             char c = ComposingChar;
             Reset();
             return c.ToString();
@@ -217,6 +227,7 @@ namespace Hangul
             _cho  = -1;
             _jung = -1;
             _jong =  0;
+            _bareJung = -1;
         }
 
         // ── 자음 입력 처리 ────────────────────────────────────────────────────
@@ -226,11 +237,13 @@ namespace Hangul
             int choIdx  = s_choIdx[jamo];
             int jongIdx = s_jongIdx.TryGetValue(jamo, out int j) ? j : 0;
 
-            // 빈 상태: 새 초성 시작
+            // 빈 상태: 새 초성 시작 (보관 중인 모음이 있으면 먼저 확정)
             if (_cho < 0)
             {
+                string bare = _bareJung < 0 ? string.Empty : s_jung[_bareJung].ToString();
+                _bareJung = -1;
                 _cho = choIdx;
-                return (string.Empty, ComposingChar);
+                return (bare, ComposingChar);
             }
 
             // 초성만: 이전 초성 확정 → 새 초성
@@ -278,11 +291,23 @@ namespace Hangul
         {
             int jungIdx = s_jungIdx[jamo];
 
-            // 빈 상태: ㅇ(인덱스 11)을 받침 없는 초성으로 사용
+            // 빈 상태: 결합할 초성이 없음 — 보관 중인 모음과 복합 모음 결합 시도
             if (_cho < 0)
             {
-                _cho = 11; _jung = jungIdx; _jong = 0;
-                return (string.Empty, ComposingChar);
+                if (_bareJung < 0)
+                {
+                    _bareJung = jungIdx;
+                    return (string.Empty, ComposingChar);
+                }
+                if (s_compoundJung.TryGetValue((_bareJung, jungIdx), out int compound))
+                {
+                    _bareJung = compound;
+                    return (string.Empty, ComposingChar);
+                }
+                // 복합 불가 → 보관 중인 모음 확정, 새 모음 보관 시작
+                string prevJamo = s_jung[_bareJung].ToString();
+                _bareJung = jungIdx;
+                return (prevJamo, ComposingChar);
             }
 
             // 초성만: 모음 결합

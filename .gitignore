@@ -8,9 +8,5 @@ obj/
 *.user
 *.suo
 
-# Test console (dev tool, not part of the library)
-TestConsole/bin/
-TestConsole/obj/
-
 # NuGet package output
 nupkg/
